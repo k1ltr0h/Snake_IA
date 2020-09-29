@@ -9,7 +9,7 @@ import pygame, sys, time, random, math
 # Hard      ->  40
 # Harder    ->  60
 # Impossible->  120
-difficulty = 120
+difficulty = 40
 
 # Window size
 frame_size_x = 720
@@ -100,10 +100,15 @@ class Snake(GameObject):
 class Food(GameObject):
     def __init__(self):
         super().__init__(x_=0, y_=0, size_x=10, size_y=10)
-        self.generate()
+        self.pos = [100,50]
 
-    def generate(self):
-        self.pos = [random.randrange(1, (frame_size_x//10)) * 10, random.randrange(1, (frame_size_y//10)) * 10]
+    def generate(self, snake_body):
+        while True:
+            #print("hols\n")
+            pos = [random.randrange(1, (frame_size_x//10)) * 10, random.randrange(1, (frame_size_y//10)) * 10]
+            if pos not in snake_body:
+                self.pos = pos
+                break
 
     def update(self):
         pass
@@ -133,7 +138,10 @@ class Screen(GameObject):
     def showScore(self, choice=1, color=white, font="consolas", size=20):
         #show_score(1, white, 'consolas', 20)
         self.score_font = pygame.font.SysFont(font, size)
-        self.score_surface = self.score_font.render('Score : ' + str(self.player.score), True, color)
+        if self.state == "play":
+            self.score_surface = self.score_font.render('Score : ' + str(self.player.score), True, color)
+        else:
+            self.score_surface = self.score_font.render('Score : ' + str(self.agent.score), True, color)
         self.score_rect = self.score_surface.get_rect()
         if choice == 1:
             self.score_rect.midtop = (frame_size_x/10, 15)
@@ -141,17 +149,30 @@ class Screen(GameObject):
             self.score_rect.midtop = (frame_size_x/2, frame_size_y/1.25)
         self.game_window.blit(self.score_surface, self.score_rect)
 
-    def changeState(self):
+    def changeState(self, newState):
+
         if self.state == "play":
-            self.state = "pause"
+            self.agent.reset()
+        elif self.state == "simulation":
+            self.agent.reset()
         elif self.state == "pause":
-            self.state = "play"
-        elif self.state == "gameover":
-            self.state = "play"
-        elif self.state == "menu" and self.pos[0] == 0:
-            self.state = "play"
-        elif self.state == "menu" and self.pos[0] == 740:
-            self.state = "simulation"
+            pass
+        elif self.state == "menu":
+            pass
+        
+        prevState = self.state
+        self.state = newState
+
+        if self.state == "play":
+            pass
+        elif self.state == "simulation":
+            pass
+        elif self.state == "pause":
+            pass
+        elif self.state == "menu":
+            pass
+
+
 
     def update(self):
         if self.state == "play":
@@ -162,7 +183,7 @@ class Screen(GameObject):
             else:
                 self.player.snake_body.pop()
             if not self.food_spawn:
-                self.food.generate()
+                self.food.generate(self.player.snake_body)
             self.food_spawn = True
             # Moving the snake
             self.player.update()
@@ -177,6 +198,7 @@ class Screen(GameObject):
             for block in self.player.snake_body[1:]:
                 if self.player.pos[0] == block[0] and self.player.pos[1] == block[1]:
                     self.gameOver()
+
         elif self.state == "simulation":
             self.agent.snake_body.insert(0, list(self.agent.pos))
             if self.agent.pos[0] == self.food.pos[0] and self.agent.pos[1] == self.food.pos[1]:
@@ -185,7 +207,7 @@ class Screen(GameObject):
             else:
                 self.agent.snake_body.pop()
             if not self.food_spawn:
-                self.food.generate()
+                self.food.generate(self.agent.snake_body)
             self.food_spawn = True
             # Moving the snake
             self.food.update()
@@ -248,45 +270,61 @@ class Agent(Snake):
         dist_y = self.food.pos[1] - pos[1]
         return math.sqrt(dist_x**2 + dist_y**2)
     
-    def greedy(self, pos = []):
-        if not pos:
-            pos = self.pos
-        #print(pos)
+    def greedy(self):
+        pos = self.pos
         short_dist = None
-        tmp_move = []
-        collision = False
-        up = [pos[0], pos[1]-10]
-        down = [pos[0], pos[1]+10]
-        left = [pos[0]-10, pos[1]]
-        right = [pos[0]+10, pos[1]]
-        moves = [up, down, left, right, pos]
-        block = self.snake_body
-        for move in moves:
-            #if not collision and not (move in block):
-            dist = self.euclidean_dist(move)
-            if short_dist == None or dist <= short_dist:
-                short_dist = dist
-                tmp_move = move
-            collision = False
-                    
-        self.path.append(tmp_move)
-        if(short_dist != 0):
-            self.greedy(tmp_move)
+
+        while short_dist != 0:
+            short_dist = None
+            tmp_move = []
+            #print(pos)
+            up = [pos[0], pos[1]-10]
+            down = [pos[0], pos[1]+10]
+            left = [pos[0]-10, pos[1]]
+            right = [pos[0]+10, pos[1]]
+            moves = [up, down, left, right]
+            block = self.snake_body
+            for move in moves:
+                if move not in block:
+                    dist = self.euclidean_dist(move)
+                    #print(dist, short_dist, self.food.pos, self.pos, self.snake_body)
+                    if (short_dist == None or dist <= short_dist) and move not in self.path:
+                        short_dist = dist
+                        tmp_move = move
+                        #print("->",move,"\n")
+            if tmp_move == []:
+                #print("\n aquí \n")
+                break
+                #self.reset()
+                #print(block)
+                #exit()
+            else:
+                self.path.append(tmp_move)
+                pos = tmp_move
         
-        #print(self.path, self.direction, short_dist)
+            #print(block, self.food.pos, "\n", self.path, "\n")
 
     def ucs(self):
         pass
+
     def a_Star(self):
         pass
+
     def update(self):
         if not self.path:
             self.greedy()
-        else:
+        try:
             self.move()
+        except:
+            self.reset()
+
     def move(self):
         self.pos = self.path[0]
         self.path.pop(0)
+
+    def reset(self):
+        super().reset()
+        self.path = []
 #Fin Clases
 
 # Checks for errors encountered
@@ -320,7 +358,20 @@ if __name__ == '__main__':
             # Whenever a key is pressed down
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    screen.changeState()
+                    if screen.state == "play":
+                        screen.changeState("pause")
+                    elif screen.state == "pause":
+                        screen.changeState("play")
+                    elif screen.state == "menu":
+                        if screen.pos[0] == 0:
+                            screen.changeState("play")
+                        if screen.pos[0] == 740:
+                            screen.changeState("simulation")
+                    elif screen.state == "gameover":
+                        screen.changeState("play")
+                if event.key == pygame.K_q or event.key == ord("q"):
+                    if screen.state == "play" or screen.state == "simulation":
+                        screen.changeState("menu")
                 if screen.state == "play":
                     # W -> Up; S -> Down; A -> Left; D -> Right
                     player.pressKey(event.key)
