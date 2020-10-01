@@ -21,7 +21,7 @@ The `difficulty` variable can be changed with the values provided in the comment
 The rest of the code is properly commented and self explanatory. Tweaks can be made to change the play style or visuals of the game.
 
 
-![Menu Background](Images/snake_bg.png)
+![Menu Background](imgs/snake_bg.png)
 
 
 ## Thanks to
