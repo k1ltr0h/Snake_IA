@@ -1,4 +1,4 @@
-import pygame, sys, time, random, math
+import pygame, sys, time, random, math, gc
 
 
 # Game variables
@@ -9,7 +9,7 @@ import pygame, sys, time, random, math
 # Hard      ->  40
 # Harder    ->  60
 # Impossible->  120
-difficulty = 40
+difficulty = 60
 
 # Window size
 frame_size_x = 720
@@ -30,23 +30,6 @@ class GameObject:
     def __init__(self, x_, y_, size_x, size_y):
         self.pos = [x_, y_]
         self.dim = [size_x, size_y]
-
-class node(GameObject):
-    def __init__(self, x_, y_):
-        super().__init__(x_, y_, 10, 10)
-        self.link_up = 1
-        self.link_down = 1
-        self.link_right = 1
-        self.link_left = 1
-        self.euclidean_cost = 0
-    def setLinkUp(self, cost):
-        self.link_up = cost
-    def setLinkDown(self, cost):
-        self.link_down = cost
-    def setLinkLeft(self, cost):
-        self.link_left = cost
-    def setLinkRight(self, cost):
-        self.link_right = cost
 
 class Snake(GameObject):
     def __init__(self, x_=100, y_=50):
@@ -172,8 +155,6 @@ class Screen(GameObject):
         elif self.state == "menu":
             pass
 
-
-
     def update(self):
         if self.state == "play":
             self.player.snake_body.insert(0, list(self.player.pos))
@@ -256,6 +237,40 @@ class Screen(GameObject):
         # Refresh rate
         fps_controller.tick(difficulty)
 
+class Node(GameObject):
+    def __init__(self, x_, y_):
+        super().__init__(x_, y_, 10, 10)
+        self.node_up = None
+        self.node_down = None
+        self.node_right = None
+        self.node_left = None
+        self.euclidean_cost = 0
+    def setCost(self, cost):
+        self.euclidean_cost = cost
+    def setAsWall(self):
+        self.euclidean_cost = 10000
+    def addNode(self):
+        pass
+
+class World(Screen):
+    def __init__(self):
+        super().__init__()
+        self.nodes = []
+
+    def createWorld(self):
+        self.nodes.append(Node(self.food.pos[0], self.food.pos[1]))
+        for block in self.agent.snake_body:
+            self.nodes.append(Node(block.pos[0], block.pos[1]).setAsWall())
+
+    def update(self):
+        super().update()
+
+    def reset(self):
+        self.nodes = []
+
+        
+
+
 class Agent(Snake):
     def __init__(self, food):
         super().__init__()
@@ -264,12 +279,13 @@ class Agent(Snake):
         self.dist = 0
         self.priority = []
         self.path = []
+        self.visited = []
 
     def euclidean_dist(self, pos):
         dist_x = self.food.pos[0] - pos[0]
         dist_y = self.food.pos[1] - pos[1]
         return math.sqrt(dist_x**2 + dist_y**2)
-    
+
     def greedy(self):
         pos = self.pos
         short_dist = None
@@ -285,7 +301,7 @@ class Agent(Snake):
             moves = [up, down, left, right]
             block = self.snake_body
             for move in moves:
-                if move not in block:
+                if move not in block and move[0] >= 0 and move[0] <= frame_size_x-10 and move[1] >= 0 and move[1] <= frame_size_y-10:
                     dist = self.euclidean_dist(move)
                     #print(dist, short_dist, self.food.pos, self.pos, self.snake_body)
                     if (short_dist == None or dist <= short_dist) and move not in self.path:
@@ -294,6 +310,7 @@ class Agent(Snake):
                         #print("->",move,"\n")
             if tmp_move == []:
                 #print("\n aquí \n")
+                print(self.path, self.priority, self.pos)
                 break
                 #self.reset()
                 #print(block)
@@ -302,6 +319,65 @@ class Agent(Snake):
                 self.path.append(tmp_move)
                 pos = tmp_move
         
+            #print(block, self.food.pos, "\n", self.path, "\n")
+    def greedy_Priority(self):
+        pos = self.pos
+        short_dist = None
+        self.visited = []
+        while short_dist != 0:
+            short_dist = None
+            sprint_moves = []
+            sprint_costs = []
+            #print(pos)
+            up = [pos[0], pos[1]-10]
+            down = [pos[0], pos[1]+10]
+            left = [pos[0]-10, pos[1]]
+            right = [pos[0]+10, pos[1]]
+            moves = [up, down, left, right]
+            block = self.snake_body
+            for move in moves:
+                if move not in block and move not in self.path and move not in self.visited and move[0] >= 0 and move[0] <= frame_size_x-10 and move[1] >= 0 and move[1] <= frame_size_y-10:
+                    dist = self.euclidean_dist(move)
+                    #sprint_costs.append(dist)
+                    sprint_moves.append(move)
+                    sprint_costs.append(dist)
+            sprint_costs = sorted(sprint_costs)
+            #print(sprint_costs)
+            temp_moves = []
+            for cost in sprint_costs:
+                for move in sprint_moves:
+                    if cost == self.euclidean_dist(move) and move not in temp_moves:
+                        temp_moves.append(move)
+            sprint_moves = temp_moves
+            self.priority.insert(0, sprint_moves)
+            if self.priority[0] == []:
+                while self.priority[0] == []:
+                    #print(self.path)
+                    if self.path != []:
+                        #print("list: ",self.priority)
+                        #print("Path: ", self.path)
+                        self.visited.append(self.path[-1])
+                        self.priority.pop(0)
+                        self.path.pop()
+                        if self.path != []:
+                            self.pos = self.path[-1]
+                        else:
+                            break
+                    else:
+                        break
+                    #print(block)
+                if self.path == []:
+                    break
+                self.path.append(self.priority[0][0])
+                #print("Fuera: ", self.priority[0][0])
+                pos = self.priority[0][0]
+                self.priority[0].pop(0)
+            else:
+                short_dist = sprint_costs[0]
+                self.path.append(sprint_moves[0])
+                pos = sprint_moves[0]
+                #print(pos)
+                self.priority[0].pop(0)
             #print(block, self.food.pos, "\n", self.path, "\n")
 
     def ucs(self):
@@ -312,7 +388,7 @@ class Agent(Snake):
 
     def update(self):
         if not self.path:
-            self.greedy()
+            self.greedy_Priority()
         try:
             self.move()
         except:
@@ -341,14 +417,14 @@ else:
 # Initialise game window
 pygame.display.set_caption('Snake')
 #game_window = pygame.display.set_mode((frame_size_x, frame_size_y))
-screen = Screen()
+world = World()
 
 # FPS (frames per second) controller
 fps_controller = pygame.time.Clock()
 
 # Main logic
 if __name__ == '__main__':
-    player = screen.player
+    player = world.player
 
     while True:
         for event in pygame.event.get():
@@ -358,32 +434,32 @@ if __name__ == '__main__':
             # Whenever a key is pressed down
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    if screen.state == "play":
-                        screen.changeState("pause")
-                    elif screen.state == "pause":
-                        screen.changeState("play")
-                    elif screen.state == "menu":
-                        if screen.pos[0] == 0:
-                            screen.changeState("play")
-                        if screen.pos[0] == 740:
-                            screen.changeState("simulation")
-                    elif screen.state == "gameover":
-                        screen.changeState("play")
+                    if world.state == "play":
+                        world.changeState("pause")
+                    elif world.state == "pause":
+                        world.changeState("play")
+                    elif world.state == "menu":
+                        if world.pos[0] == 0:
+                            world.changeState("play")
+                        if world.pos[0] == 740:
+                            world.changeState("simulation")
+                    elif world.state == "gameover":
+                        world.changeState("play")
                 if event.key == pygame.K_q or event.key == ord("q"):
-                    if screen.state == "play" or screen.state == "simulation":
-                        screen.changeState("menu")
-                if screen.state == "play":
+                    if world.state == "play" or world.state == "simulation":
+                        world.changeState("menu")
+                if world.state == "play":
                     # W -> Up; S -> Down; A -> Left; D -> Right
                     player.pressKey(event.key)
-                if screen.state == "menu":
-                    if (event.key == pygame.K_LEFT or event.key == ord('a')) and screen.pos[0] != 0:
-                        screen.pos[0] -= 740 
-                    elif (event.key == pygame.K_RIGHT or event.key == ord('d')) and screen.pos[0] != 740:
-                        screen.pos[0] += 740 
+                if world.state == "menu":
+                    if (event.key == pygame.K_LEFT or event.key == ord('a')) and world.pos[0] != 0:
+                        world.pos[0] -= 740 
+                    elif (event.key == pygame.K_RIGHT or event.key == ord('d')) and world.pos[0] != 740:
+                        world.pos[0] += 740 
                     #print(screen.pos)
                 # Esc -> Create event to quit the game
                 if event.key == pygame.K_ESCAPE:
                     pygame.event.post(pygame.event.Event(pygame.QUIT))
 
-        screen.update()
-        screen.render()
+        world.update()
+        world.render()
