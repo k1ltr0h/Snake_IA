@@ -1,5 +1,8 @@
-# Snake Eater
+# Snake-IA
 A snake game with agent written in Python using the PyGame library and IA algorithms.
+
+* Greedy Algorithm with priority queue for static environment 100%
+* ...  
 
 
 ## Installing
@@ -22,6 +25,8 @@ The rest of the code is properly commented and self explanatory. Tweaks can be m
 
 
 ![Menu Background](imgs/snake_bg.png)
+
+[Greedy in action](https://www.youtube.com/watch?v=Wb_aUWTxIuA)
 
 
 ## Thanks to

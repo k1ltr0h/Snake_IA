@@ -23,7 +23,7 @@ green = pygame.Color(0, 255, 0)
 blue = pygame.Color(0, 0, 255)
 
 #Imgs
-bg = pygame.image.load("snake.png")
+bg = pygame.image.load("imgs/snake.png")
 
 #Clases
 class GameObject:
@@ -35,9 +35,12 @@ class Snake(GameObject):
     def __init__(self, x_=100, y_=50):
         super().__init__(x_, y_, size_x=10, size_y=10)
         self.reset()
+        self.highScore = 0
 
     def grow(self):
         self.score += 1
+        if self.score > self.highScore:
+            self.highScore = self.score
 
     def update(self):
         self.move()
@@ -83,7 +86,7 @@ class Snake(GameObject):
 class Food(GameObject):
     def __init__(self):
         super().__init__(x_=0, y_=0, size_x=10, size_y=10)
-        self.pos = [100,50]
+        self.pos = [500,50]
 
     def generate(self, snake_body):
         while True:
@@ -123,14 +126,19 @@ class Screen(GameObject):
         self.score_font = pygame.font.SysFont(font, size)
         if self.state == "play":
             self.score_surface = self.score_font.render('Score : ' + str(self.player.score), True, color)
+            self.highScore_surface = self.score_font.render('HighScore : ' + str(self.player.highScore), True, color)
         else:
             self.score_surface = self.score_font.render('Score : ' + str(self.agent.score), True, color)
+            self.highScore_surface = self.score_font.render('HighScore : ' + str(self.agent.highScore), True, color)
         self.score_rect = self.score_surface.get_rect()
+        self.highScore_rect = self.highScore_surface.get_rect()
         if choice == 1:
             self.score_rect.midtop = (frame_size_x/10, 15)
+            self.highScore_rect.midtop = (4*frame_size_x/5, 15)
         else:
             self.score_rect.midtop = (frame_size_x/2, frame_size_y/1.25)
         self.game_window.blit(self.score_surface, self.score_rect)
+        self.game_window.blit(self.highScore_surface, self.highScore_rect)
 
     def changeState(self, newState):
 
@@ -293,92 +301,88 @@ class Agent(Snake):
         while short_dist != 0:
             short_dist = None
             tmp_move = []
-            #print(pos)
             up = [pos[0], pos[1]-10]
             down = [pos[0], pos[1]+10]
             left = [pos[0]-10, pos[1]]
             right = [pos[0]+10, pos[1]]
             moves = [up, down, left, right]
             block = self.snake_body
+
             for move in moves:
                 if move not in block and move[0] >= 0 and move[0] <= frame_size_x-10 and move[1] >= 0 and move[1] <= frame_size_y-10:
                     dist = self.euclidean_dist(move)
-                    #print(dist, short_dist, self.food.pos, self.pos, self.snake_body)
                     if (short_dist == None or dist <= short_dist) and move not in self.path:
                         short_dist = dist
                         tmp_move = move
-                        #print("->",move,"\n")
+
             if tmp_move == []:
-                #print("\n aquí \n")
-                print(self.path, self.priority, self.pos)
                 break
-                #self.reset()
-                #print(block)
-                #exit()
             else:
                 self.path.append(tmp_move)
                 pos = tmp_move
         
-            #print(block, self.food.pos, "\n", self.path, "\n")
     def greedy_Priority(self):
         pos = self.pos
+        first_pos = self.pos
         short_dist = None
         self.visited = []
+        self.priority = []
+        fin = False
         while short_dist != 0:
             short_dist = None
             sprint_moves = []
             sprint_costs = []
-            #print(pos)
+
             up = [pos[0], pos[1]-10]
             down = [pos[0], pos[1]+10]
             left = [pos[0]-10, pos[1]]
             right = [pos[0]+10, pos[1]]
             moves = [up, down, left, right]
             block = self.snake_body
+
             for move in moves:
                 if move not in block and move not in self.path and move not in self.visited and move[0] >= 0 and move[0] <= frame_size_x-10 and move[1] >= 0 and move[1] <= frame_size_y-10:
                     dist = self.euclidean_dist(move)
-                    #sprint_costs.append(dist)
                     sprint_moves.append(move)
                     sprint_costs.append(dist)
+
             sprint_costs = sorted(sprint_costs)
-            #print(sprint_costs)
             temp_moves = []
+
             for cost in sprint_costs:
                 for move in sprint_moves:
                     if cost == self.euclidean_dist(move) and move not in temp_moves:
                         temp_moves.append(move)
+
             sprint_moves = temp_moves
             self.priority.insert(0, sprint_moves)
+
             if self.priority[0] == []:
+
                 while self.priority[0] == []:
-                    #print(self.path)
                     if self.path != []:
-                        #print("list: ",self.priority)
-                        #print("Path: ", self.path)
                         self.visited.append(self.path[-1])
                         self.priority.pop(0)
                         self.path.pop()
-                        if self.path != []:
-                            self.pos = self.path[-1]
-                        else:
-                            break
                     else:
+                        fin = True
                         break
-                    #print(block)
-                if self.path == []:
+
+                if fin:
+                    pos = first_pos
+                    self.path.append(pos)
+                    self.greedy()
                     break
+
                 self.path.append(self.priority[0][0])
-                #print("Fuera: ", self.priority[0][0])
                 pos = self.priority[0][0]
                 self.priority[0].pop(0)
+
             else:
                 short_dist = sprint_costs[0]
                 self.path.append(sprint_moves[0])
                 pos = sprint_moves[0]
-                #print(pos)
                 self.priority[0].pop(0)
-            #print(block, self.food.pos, "\n", self.path, "\n")
 
     def ucs(self):
         pass
