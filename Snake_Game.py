@@ -9,7 +9,7 @@ import pygame, sys, time, random, math, gc
 # Hard      ->  40
 # Harder    ->  60
 # Impossible->  120
-difficulty = 60
+#difficulty = 60
 
 # Window size
 frame_size_x = 720
@@ -23,7 +23,9 @@ green = pygame.Color(0, 255, 0)
 blue = pygame.Color(0, 0, 255)
 
 #Imgs
-bg = pygame.image.load("imgs/snake.png")
+menu_bg = pygame.image.load("imgs/snake.png")
+#game_bg = pygame.image.load("imgs/background.png")
+
 
 #Clases
 class GameObject:
@@ -108,18 +110,62 @@ class Screen(GameObject):
         self.agent = Agent(self.food)
         self.food_spawn = True
         self.state = "menu"
+        self.prevState = ""
+        self.difficulty = 100
 
     def gameOver(self):
-        self.my_font = pygame.font.SysFont('times new roman', 90)
-        self.game_over_surface = self.my_font.render('YOU DIED', True, red)
-        self.game_over_rect = self.game_over_surface.get_rect()
-        self.game_over_rect.midtop = (frame_size_x/2, frame_size_y/4)
+        my_font = pygame.font.SysFont('times new roman', 90)
+        game_over_surface = my_font.render('YOU DIED', True, red)
+        game_over_rect = game_over_surface.get_rect()
+        game_over_rect.midtop = (frame_size_x/2, frame_size_y/4)
         self.game_window.fill(black)
-        self.game_window.blit(self.game_over_surface, self.game_over_rect)
+        self.game_window.blit(game_over_surface, game_over_rect)
         self.showScore(0, red, 'times', 20)
         pygame.display.flip()
         self.state = "gameover"
-        self.player.reset()
+    
+    def options(self):
+        self.game_window.fill(black)
+        my_font = pygame.font.SysFont('times new roman', 30)
+        if self.prevState == "play":
+
+            if self.difficulty == 20:
+                dif = " Easy >"
+            elif self.difficulty == 40:
+                dif = "< Normal >"
+            elif self.difficulty == 60:
+                dif = "< Difícil >"
+            elif self.difficulty == 80:
+                dif = "< Muy difícil >"
+            elif self.difficulty == 100:
+                dif = "< Imposible"
+            
+            dificultad_surface = my_font.render('Dificultad: ', True, red)
+            dif_lvl_surface = my_font.render(dif, True, red)
+            dificultad_rect = dificultad_surface.get_rect()
+            dif_lvl_surface_rect = dif_lvl_surface.get_rect()
+            dificultad_rect.midtop = (frame_size_x/3, frame_size_y/4)
+            dif_lvl_surface_rect.midtop = (2*frame_size_x/3, frame_size_y/4)
+            self.game_window.blit(dificultad_surface, dificultad_rect)
+            self.game_window.blit(dif_lvl_surface, dif_lvl_surface_rect)
+
+        elif self.prevState == "simulation":
+            alg_index = self.agent.algorithm
+
+            if alg_index == 0:
+                alg = self.agent.algorithm_array[alg_index] + " >"
+            elif alg_index == 1:
+                alg = "< " + self.agent.algorithm_array[alg_index]
+
+            algorithm_surface = my_font.render('Algoritmo: ', True, red)
+            alg_type_surface = my_font.render(alg , True, red)
+            algorithm_rect = algorithm_surface.get_rect()
+            alg_type_rect = alg_type_surface.get_rect()
+            algorithm_rect.midtop = (frame_size_x/3, frame_size_y/4)
+            alg_type_rect.midtop = (2*frame_size_x/3, frame_size_y/4)
+            self.game_window.blit(algorithm_surface, algorithm_rect)
+            self.game_window.blit(alg_type_surface, alg_type_rect)
+
 
     def showScore(self, choice=1, color=white, font="consolas", size=20):
         #show_score(1, white, 'consolas', 20)
@@ -143,25 +189,106 @@ class Screen(GameObject):
     def changeState(self, newState):
 
         if self.state == "play":
-            self.agent.reset()
+            pass
         elif self.state == "simulation":
-            self.agent.reset()
+            pass
         elif self.state == "pause":
             pass
         elif self.state == "menu":
-            pass
+            self.player.reset()
+            self.agent.reset()
+            self.difficulty = 40
+        elif self.state == "gameover":
+            self.player.reset()
+            self.agent.reset()
+
         
-        prevState = self.state
+        self.prevState = self.state
         self.state = newState
 
         if self.state == "play":
             pass
         elif self.state == "simulation":
-            pass
+            self.difficulty = 100
         elif self.state == "pause":
             pass
         elif self.state == "menu":
             pass
+        elif self.state == "gameover":
+            pass
+            
+    def render(self):
+        # GFX
+        if self.state == "play":
+            self.game_window.fill(black)
+            #self.game_window.blit(game_bg, (0, 0))
+            for pos in self.player.snake_body:
+                # Snake body
+                # .draw.rect(play_surface, color, xy-coordinate)
+                # xy-coordinate -> .Rect(x, y, size_x, size_y)
+                pygame.draw.rect(self.game_window, green, pygame.Rect(pos[0], pos[1], 10, 10))
+            # Snake food
+            pygame.draw.rect(self.game_window, white, pygame.Rect(self.food.pos[0], self.food.pos[1], 10, 10))
+            self.showScore()
+
+        elif self.state == "simulation":
+            self.game_window.fill(black)
+            #self.game_window.blit(game_bg, (0, 0))
+            for pos in self.agent.snake_body:
+                # Snake body
+                # .draw.rect(play_surface, color, xy-coordinate)
+                # xy-coordinate -> .Rect(x, y, size_x, size_y)
+                #print(self.agent.pos)
+                pygame.draw.rect(self.game_window, green, pygame.Rect(pos[0], pos[1], 10, 10))
+            # Snake food
+            pygame.draw.rect(self.game_window, white, pygame.Rect(self.food.pos[0], self.food.pos[1], 10, 10))
+            self.showScore()
+
+        elif self.state == "menu":
+            self.game_window.blit(menu_bg, (0, 0), (self.pos[0], self.pos[1], 720, 480))
+        # Refresh game screen
+        pygame.display.update()
+        # Refresh rate
+        fps_controller.tick(self.difficulty)
+
+class Node(GameObject):
+    def __init__(self, x_, y_):
+        super().__init__(x_, y_, 10, 10)
+        self.node_up = None
+        self.node_down = None
+        self.node_right = None
+        self.node_left = None
+        self.euclidean_cost = 0
+    def setCost(self, cost):
+        self.euclidean_cost = cost
+    def setAsWall(self):
+        self.euclidean_cost = 10000
+    def addUp(self):
+        self.node_up = Node(self.pos[0], self.pos[1]-10)
+    def addDown(self):
+        self.node_down = Node(self.pos[0], self.pos[1]+10)
+    def addLeft(self):
+        self.node_left = Node(self.pos[0]-10, self.pos[1])
+    def addRight(self):
+        self.node_right = Node(self.pos[0]+10, self.pos[1])
+
+class Graph:
+    def __init__(self):
+        self.nodes = []
+        self.explored = []
+    def addNode(self, node):
+        self.nodes.append(node)
+
+class World(Screen):
+    def __init__(self):
+        super().__init__()
+        self.map = []
+        self.tree = Graph()
+
+
+    def createWorld(self):
+        for block in self.agent.snake_body:
+            self.map.append(Node(block.pos[0], block.pos[1]).setAsWall())
 
     def update(self):
         if self.state == "play":
@@ -177,16 +304,6 @@ class Screen(GameObject):
             # Moving the snake
             self.player.update()
             self.food.update()
-            # Game Over conditions
-            # Getting out of bounds
-            if self.player.pos[0] < 0 or self.player.pos[0] > frame_size_x-10:
-                self.gameOver()
-            if self.player.pos[1] < 0 or self.player.pos[1] > frame_size_y-10:
-                self.gameOver()
-            # Touching the snake body
-            for block in self.player.snake_body[1:]:
-                if self.player.pos[0] == block[0] and self.player.pos[1] == block[1]:
-                    self.gameOver()
 
         elif self.state == "simulation":
             self.agent.snake_body.insert(0, list(self.agent.pos))
@@ -201,7 +318,25 @@ class Screen(GameObject):
             # Moving the snake
             self.food.update()
             self.agent.update()
-            # Game Over conditions
+
+        self.checkCollitions()
+
+    def reset(self):
+        self.nodes = []
+
+    def checkCollitions(self):
+        # Game Over conditions
+        if self.state == "play":
+            # Getting out of bounds
+            if self.player.pos[0] < 0 or self.player.pos[0] > frame_size_x-10:
+                self.gameOver()
+            if self.player.pos[1] < 0 or self.player.pos[1] > frame_size_y-10:
+                self.gameOver()
+            # Touching the snake body
+            for block in self.player.snake_body[1:]:
+                if self.player.pos[0] == block[0] and self.player.pos[1] == block[1]:
+                    self.gameOver()
+        elif self.state == "simulation":
             # Getting out of bounds
             if self.agent.pos[0] < 0 or self.agent.pos[0] > frame_size_x-10:
                 self.agent.reset()
@@ -211,72 +346,7 @@ class Screen(GameObject):
             for block in self.agent.snake_body[1:]:
                 if self.agent.pos[0] == block[0] and self.agent.pos[1] == block[1]:
                     print("auch")
-                    self.agent.reset()
-            
-    def render(self):
-        # GFX
-        if self.state == "play":
-            self.game_window.fill(black)
-            for pos in self.player.snake_body:
-                # Snake body
-                # .draw.rect(play_surface, color, xy-coordinate)
-                # xy-coordinate -> .Rect(x, y, size_x, size_y)
-                pygame.draw.rect(self.game_window, green, pygame.Rect(pos[0], pos[1], 10, 10))
-            # Snake food
-            pygame.draw.rect(self.game_window, white, pygame.Rect(self.food.pos[0], self.food.pos[1], 10, 10))
-            self.showScore()
-
-        elif self.state == "simulation":
-            self.game_window.fill(black)
-            for pos in self.agent.snake_body:
-                # Snake body
-                # .draw.rect(play_surface, color, xy-coordinate)
-                # xy-coordinate -> .Rect(x, y, size_x, size_y)
-                #print(self.agent.pos)
-                pygame.draw.rect(self.game_window, green, pygame.Rect(pos[0], pos[1], 10, 10))
-            # Snake food
-            pygame.draw.rect(self.game_window, white, pygame.Rect(self.food.pos[0], self.food.pos[1], 10, 10))
-            self.showScore()
-
-        elif self.state == "menu":
-            self.game_window.blit(bg, (0, 0), (self.pos[0], self.pos[1], 740, 480))
-        # Refresh game screen
-        pygame.display.update()
-        # Refresh rate
-        fps_controller.tick(difficulty)
-
-class Node(GameObject):
-    def __init__(self, x_, y_):
-        super().__init__(x_, y_, 10, 10)
-        self.node_up = None
-        self.node_down = None
-        self.node_right = None
-        self.node_left = None
-        self.euclidean_cost = 0
-    def setCost(self, cost):
-        self.euclidean_cost = cost
-    def setAsWall(self):
-        self.euclidean_cost = 10000
-    def addNode(self):
-        pass
-
-class World(Screen):
-    def __init__(self):
-        super().__init__()
-        self.nodes = []
-
-    def createWorld(self):
-        self.nodes.append(Node(self.food.pos[0], self.food.pos[1]))
-        for block in self.agent.snake_body:
-            self.nodes.append(Node(block.pos[0], block.pos[1]).setAsWall())
-
-    def update(self):
-        super().update()
-
-    def reset(self):
-        self.nodes = []
-
-        
+                    self.agent.reset()      
 
 
 class Agent(Snake):
@@ -288,6 +358,8 @@ class Agent(Snake):
         self.priority = []
         self.path = []
         self.visited = []
+        self.algorithm = 1
+        self.algorithm_array = ["Greedy", "Greedy_DFS_Priority"]
 
     def euclidean_dist(self, pos):
         dist_x = self.food.pos[0] - pos[0]
@@ -390,17 +462,28 @@ class Agent(Snake):
     def a_Star(self):
         pass
 
+    def rtt_Star(self, graph):
+        while True:
+            q_rand = [random.randrange(1, (frame_size_x//10)) * 10, random.randrange(1, (frame_size_y//10)) * 10]
+            if q_rand not in self.snake_body and q_rand not in graph.nodes:
+                break
+
     def update(self):
-        if not self.path:
-            self.greedy_Priority()
-        try:
-            self.move()
-        except:
-            self.reset()
+        if self.algorithm_array[self.algorithm] == "Greedy_DFS_Priority":
+            if not self.path:
+                self.greedy_Priority()
+        elif self.algorithm_array[self.algorithm] == "Greedy":
+            if not self.path:
+                self.greedy()
+        
+        self.move()
 
     def move(self):
-        self.pos = self.path[0]
-        self.path.pop(0)
+        if self.path != []:
+            self.pos = self.path[0]
+            self.path.pop(0)
+        else:
+            self.reset()
 
     def reset(self):
         super().reset()
@@ -438,28 +521,49 @@ if __name__ == '__main__':
             # Whenever a key is pressed down
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    if world.state == "play":
+
+                    if world.state == "play" or world.state == "simulation":
                         world.changeState("pause")
-                    elif world.state == "pause":
+                    elif world.state == "pause" and world.prevState == "play":
                         world.changeState("play")
+                    elif world.state == "pause" and world.prevState == "simulation":
+                        world.changeState("simulation")
+
                     elif world.state == "menu":
                         if world.pos[0] == 0:
                             world.changeState("play")
-                        if world.pos[0] == 740:
+                        if world.pos[0] == 720:
                             world.changeState("simulation")
+
                     elif world.state == "gameover":
                         world.changeState("play")
+
                 if event.key == pygame.K_q or event.key == ord("q"):
                     if world.state == "play" or world.state == "simulation":
                         world.changeState("menu")
                 if world.state == "play":
                     # W -> Up; S -> Down; A -> Left; D -> Right
                     player.pressKey(event.key)
-                if world.state == "menu":
+
+                elif world.state == "menu":
                     if (event.key == pygame.K_LEFT or event.key == ord('a')) and world.pos[0] != 0:
-                        world.pos[0] -= 740 
-                    elif (event.key == pygame.K_RIGHT or event.key == ord('d')) and world.pos[0] != 740:
-                        world.pos[0] += 740 
+                        world.pos[0] -= 720 
+                    elif (event.key == pygame.K_RIGHT or event.key == ord('d')) and world.pos[0] != 720:
+                        world.pos[0] += 720 
+
+                elif world.state == "pause":
+                    if world.prevState == "play":
+                        if (event.key == pygame.K_LEFT or event.key == ord('a')) and world.difficulty != 20:
+                            world.difficulty -= 20 
+                        elif (event.key == pygame.K_RIGHT or event.key == ord('d')) and world.difficulty != 100:
+                            world.difficulty += 20
+                    elif world.prevState == "simulation":
+                        if (event.key == pygame.K_LEFT or event.key == ord('a')) and world.agent.algorithm != 0:
+                            world.agent.algorithm -= 1 
+                        elif (event.key == pygame.K_RIGHT or event.key == ord('d')) and world.agent.algorithm != len(world.agent.algorithm_array)-1:
+                            world.agent.algorithm += 1
+                    world.options()
+                
                     #print(screen.pos)
                 # Esc -> Create event to quit the game
                 if event.key == pygame.K_ESCAPE:
