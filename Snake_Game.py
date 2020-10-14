@@ -15,6 +15,8 @@ import pygame, sys, time, random, math, gc
 frame_size_x = 720
 frame_size_y = 480
 
+difficulty_var = 20
+
 # Colors (R, G, B)
 black = pygame.Color(0, 0, 0)
 white = pygame.Color(255, 255, 255)
@@ -129,15 +131,15 @@ class Screen(GameObject):
         my_font = pygame.font.SysFont('times new roman', 30)
         if self.prevState == "play":
 
-            if self.difficulty == 20:
+            if self.difficulty == difficulty_var:
                 dif = " Easy >"
-            elif self.difficulty == 40:
+            elif self.difficulty == difficulty_var*2:
                 dif = "< Normal >"
-            elif self.difficulty == 60:
+            elif self.difficulty == difficulty_var*3:
                 dif = "< Difícil >"
-            elif self.difficulty == 80:
+            elif self.difficulty == difficulty_var*4:
                 dif = "< Muy difícil >"
-            elif self.difficulty == 100:
+            elif self.difficulty == difficulty_var*5:
                 dif = "< Imposible"
             
             dificultad_surface = my_font.render('Dificultad: ', True, red)
@@ -155,6 +157,8 @@ class Screen(GameObject):
             if alg_index == 0:
                 alg = self.agent.algorithm_array[alg_index] + " >"
             elif alg_index == 1:
+                alg = "< " + self.agent.algorithm_array[alg_index] + " >"
+            elif alg_index == 2:
                 alg = "< " + self.agent.algorithm_array[alg_index]
 
             algorithm_surface = my_font.render('Algoritmo: ', True, red)
@@ -259,36 +263,58 @@ class Node(GameObject):
         self.node_right = None
         self.node_left = None
         self.euclidean_cost = 0
+        self.up = [self.pos[0], self.pos[1]-10]
+        self.down = [self.pos[0], self.pos[1]+10]
+        self.left = [self.pos[0]-10, self.pos[1]]
+        self.right = [self.pos[0]+10, self.pos[1]]
+        self.fullConnected = False
+
+    def update(self):
+        if self.node_up != None and self.node_down != None and self.node_left != None and self.node_right != None:
+            self.fullConnected = True
+
     def setCost(self, cost):
         self.euclidean_cost = cost
     def setAsWall(self):
         self.euclidean_cost = 10000
+
     def addUp(self):
         self.node_up = Node(self.pos[0], self.pos[1]-10)
+        return self.node_up
+
     def addDown(self):
         self.node_down = Node(self.pos[0], self.pos[1]+10)
+        return self.node_down
+
     def addLeft(self):
         self.node_left = Node(self.pos[0]-10, self.pos[1])
+        return self.node_left
+
     def addRight(self):
         self.node_right = Node(self.pos[0]+10, self.pos[1])
+        return self.node_right
 
 class Graph:
-    def __init__(self):
-        self.nodes = []
-        self.explored = []
-    def addNode(self, node):
-        self.nodes.append(node)
+    def __init__(self, startNode):
+        self.nodes = [startNode]
+        self.explored = [] #nodos fullConnected
+
+    def addNode(self, node, dir, cost):
+        if dir == 0:
+            newNode = node.addUp()
+        elif dir == 1:
+            newNode = node.addDown()
+        elif dir == 2:
+            newNode = node.addLeft()
+        elif dir == 3:
+            newNode = node.addRight()
+    
+        self.nodes.append(newNode)
+        newNode.setCost(cost)
 
 class World(Screen):
     def __init__(self):
         super().__init__()
-        self.map = []
-        self.tree = Graph()
-
-
-    def createWorld(self):
-        for block in self.agent.snake_body:
-            self.map.append(Node(block.pos[0], block.pos[1]).setAsWall())
 
     def update(self):
         if self.state == "play":
@@ -352,19 +378,125 @@ class World(Screen):
 class Agent(Snake):
     def __init__(self, food):
         super().__init__()
-        self.wall_cost = 1000
         self.food = food
         self.dist = 0
+        self.map = []
         self.priority = []
         self.path = []
         self.visited = []
         self.algorithm = 1
-        self.algorithm_array = ["Greedy", "Greedy_DFS_Priority"]
+        self.algorithm_array = ["Greedy", "Greedy_DFS_Priority", "RRT"]
+        self.readWorld()
+        self.cleanTree()
 
-    def euclidean_dist(self, pos):
-        dist_x = self.food.pos[0] - pos[0]
-        dist_y = self.food.pos[1] - pos[1]
+    def cleanTree(self):
+        self.tree = Graph(Node(self.pos[0], self.pos[1]))
+    
+    def readWorld(self):
+        self.map = []
+        for node in range(int(frame_size_x/10)):
+            x = node*10
+            for otherNode in range(int(frame_size_y/10)):
+                y = otherNode*10
+                self.map.append([x, y])
+
+        for node in self.snake_body[1:]:
+            self.map.remove(node)
+
+        if self.snake_body[0] != self.snake_body[1]:
+            self.map.remove(self.snake_body[0])
+
+    def euclidean_dist(self, pos, obj = None):
+        if obj == None:
+            obj = self.food.pos
+        dist_x = obj[0] - pos[0]
+        dist_y = obj[1] - pos[1]
         return math.sqrt(dist_x**2 + dist_y**2)
+
+    def rrt(self):
+        pos = self.pos
+        self.readWorld()
+        self.cleanTree()
+        self.visited = []
+        while True:
+            q_rand = self.map[random.randrange(len(self.map))]
+            tmp_cost = None
+            tmp_move = None
+            tmp_node = None
+            move_flag = 0
+
+            #Implementar zonas para encontrar el nodo más cercano con mayor eficiencia
+            
+            for node in self.tree.nodes:
+
+                if node.pos not in self.visited:
+                    counter = 0
+                    moves = [node.up, node.down, node.left, node.right]
+
+                    for move in moves:
+                        cost = self.euclidean_dist(move, q_rand)
+                        if move in self.map and (tmp_cost == None or tmp_cost > cost):
+                            tmp_cost = cost
+                            tmp_move = move
+                            tmp_node = node
+                            move_flag = counter
+                        counter = counter + 1
+                    if tmp_move == None:
+                        self.visited.append(node.pos)
+                    else:
+                        break           
+                    
+            self.tree.addNode(tmp_node, move_flag, tmp_cost)
+            self.map.remove(tmp_move)
+
+            #print(len(self.map))
+            #print(len(self.tree.nodes))
+
+            if tmp_move == self.food.pos:
+                print("Objetivo encontrado e.e!!!\n", self.food.pos)
+                break
+
+        # Greedy DFS Priority para grafos
+        pos = self.tree.nodes[0]
+        self.visited = []
+        while pos.pos != self.food.pos:
+            links = [pos.node_up, pos.node_down, pos.node_left, pos.node_right]
+            tmp_cost = None
+            sprint_costs = []
+
+            for node in links[::-1]:
+                if node == None or node in self.visited:
+                    links.remove(node)
+
+            for node in links:
+                for otherNode in links:
+                    if node != otherNode and otherNode.euclidean_cost < node.euclidean_cost:
+                        index_a = links.index(node)
+                        index_b = links.index(otherNode)
+                        tmp = node
+                        links[index_a] = otherNode
+                        links[index_b] = tmp
+
+            self.priority.insert(0, links)
+            if self.priority[0] == []:
+
+                while self.priority[0] == []:
+                    self.visited.append(self.path[-1])
+                    self.priority.pop(0)
+                    self.path.pop()
+
+
+                self.path.append(self.priority[0][0])
+                pos = self.priority[0][0]
+                self.priority[0].pop(0)
+
+            else:
+                self.path.append(links[0])
+                pos = links[0]
+                self.priority[0].pop(0)
+               
+        for node in range(len(self.path)):
+           self.path[node] = self.path[node].pos
 
     def greedy(self):
         pos = self.pos
@@ -462,19 +594,14 @@ class Agent(Snake):
     def a_Star(self):
         pass
 
-    def rtt_Star(self, graph):
-        while True:
-            q_rand = [random.randrange(1, (frame_size_x//10)) * 10, random.randrange(1, (frame_size_y//10)) * 10]
-            if q_rand not in self.snake_body and q_rand not in graph.nodes:
-                break
-
     def update(self):
-        if self.algorithm_array[self.algorithm] == "Greedy_DFS_Priority":
-            if not self.path:
+        if not self.path:
+            if self.algorithm_array[self.algorithm] == "Greedy_DFS_Priority":
                 self.greedy_Priority()
-        elif self.algorithm_array[self.algorithm] == "Greedy":
-            if not self.path:
+            elif self.algorithm_array[self.algorithm] == "Greedy":
                 self.greedy()
+            elif self.algorithm_array[self.algorithm] == "RRT":
+                self.rrt()
         
         self.move()
 
@@ -547,16 +674,16 @@ if __name__ == '__main__':
 
                 elif world.state == "menu":
                     if (event.key == pygame.K_LEFT or event.key == ord('a')) and world.pos[0] != 0:
-                        world.pos[0] -= 720 
-                    elif (event.key == pygame.K_RIGHT or event.key == ord('d')) and world.pos[0] != 720:
-                        world.pos[0] += 720 
+                        world.pos[0] -= frame_size_x 
+                    elif (event.key == pygame.K_RIGHT or event.key == ord('d')) and world.pos[0] != frame_size_x:
+                        world.pos[0] += frame_size_x 
 
                 elif world.state == "pause":
                     if world.prevState == "play":
-                        if (event.key == pygame.K_LEFT or event.key == ord('a')) and world.difficulty != 20:
-                            world.difficulty -= 20 
-                        elif (event.key == pygame.K_RIGHT or event.key == ord('d')) and world.difficulty != 100:
-                            world.difficulty += 20
+                        if (event.key == pygame.K_LEFT or event.key == ord('a')) and world.difficulty != difficulty_var:
+                            world.difficulty -= difficulty_var 
+                        elif (event.key == pygame.K_RIGHT or event.key == ord('d')) and world.difficulty != difficulty_var*5:
+                            world.difficulty += difficulty_var
                     elif world.prevState == "simulation":
                         if (event.key == pygame.K_LEFT or event.key == ord('a')) and world.agent.algorithm != 0:
                             world.agent.algorithm -= 1 
@@ -564,7 +691,6 @@ if __name__ == '__main__':
                             world.agent.algorithm += 1
                     world.options()
                 
-                    #print(screen.pos)
                 # Esc -> Create event to quit the game
                 if event.key == pygame.K_ESCAPE:
                     pygame.event.post(pygame.event.Event(pygame.QUIT))
